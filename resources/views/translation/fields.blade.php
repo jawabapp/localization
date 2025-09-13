@@ -1,10 +1,10 @@
 @if($item->id ?? false)
     <?php
-    $locales = config('localization.locales');
+    $locales = config('localization.locale_names');
     foreach ($locales as $code => &$locale) {
         $locale = [
             'title' => $locale,
-            'translation' => \Jawabapp\Localization\Models\Translation::where('key', $item->key)->where('language_code', $code)->first()
+            'translation' => \Jawabapp\Localization\Models\Translation::where('key', $item->key)->where('locale', $code)->first()
         ];
     }
 
@@ -37,7 +37,7 @@
             <button type="submit" class="btn btn-primary">
                 Save
             </button>
-            <a href="{{route('jawab.translation.index')}}" class="btn btn-default">Cancel</a>
+            <a href="{{route('localization.jawab.translation.index')}}" class="btn btn-default">Cancel</a>
         </div>
     </div>
 @endif

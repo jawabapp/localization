@@ -35,14 +35,14 @@ class TranslationController extends Controller
         }
 
         if(!empty($filters['language_code'])) {
-            $query->where('language_code', $filters['language_code']);
+            $query->where('locale', $filters['language_code']);
         }
 
         if(!empty($filters['miss_code'])) {
             $translationTable = app(Translation::class)->getTable();
             $query->whereNotIn('key', function ($q) use ($translationTable, $filters) {
                 $q->select('t.key')->from("{$translationTable} AS t")
-                    ->where('t.language_code', $filters['miss_code']);
+                    ->where('t.locale', $filters['miss_code']);
             });
         }
 
@@ -60,7 +60,7 @@ class TranslationController extends Controller
         $item = Translation::find($id);
 
         if (!$item->id) {
-            return redirect(route('jawab.translation.index', session()->get('query')));
+            return redirect(route('localization.jawab.translation.index', session()->get('query')));
         }
 
         return view('localization::translation.edit')->with('item', $item);
@@ -77,10 +77,10 @@ class TranslationController extends Controller
                 Localization::addKeyToTranslation($item->key, $value, $langCode);
             }
 
-            return redirect(route('jawab.translation.index', session()->get('query')));
+            return redirect(route('localization.jawab.translation.index', session()->get('query')));
         }
 
-        return redirect(route('jawab.translation.index', session()->get('query')));
+        return redirect(route('localization.jawab.translation.index', session()->get('query')));
     }
 
     public function destroy(Request $request, $id)
@@ -88,12 +88,12 @@ class TranslationController extends Controller
         $item = Translation::find($id);
 
         if (!$item->id) {
-            return redirect(route('jawab.translation.index', session()->get('query')));
+            return redirect(route('localization.jawab.translation.index', session()->get('query')));
         }
 
         $item->delete();
 
-        return redirect(route('jawab.translation.index', session()->get('query')));
+        return redirect(route('localization.jawab.translation.index', session()->get('query')));
     }
 
     public function generate(Request $request)
