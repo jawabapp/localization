@@ -264,7 +264,7 @@ class Localization
                 File::makeDirectory($langPath, 0755, true);
             }
 
-            $content = "<?php\n\nreturn " . var_export($items, true) . ";\n";
+            $content = "<?php\n\nreturn " . self::arrayToString($items) . ";\n";
             File::put($filePath, $content);
         }
     }
@@ -491,5 +491,51 @@ class Localization
         }
 
         return $urls;
+    }
+
+    /**
+     * Convert array to string with bracket syntax
+     */
+    private static function arrayToString(array $array, int $indent = 1): string
+    {
+        $isAssoc = self::isAssociativeArray($array);
+        $indentStr = str_repeat('    ', $indent);
+        $result = '[' . "\n";
+
+        foreach ($array as $key => $value) {
+            $result .= $indentStr;
+
+            if ($isAssoc) {
+                $result .= "'" . addslashes($key) . "' => ";
+            }
+
+            if (is_array($value)) {
+                $result .= self::arrayToString($value, $indent + 1);
+            } elseif (is_string($value)) {
+                $result .= "'" . addslashes($value) . "'";
+            } elseif (is_null($value)) {
+                $result .= 'null';
+            } elseif (is_bool($value)) {
+                $result .= $value ? 'true' : 'false';
+            } else {
+                $result .= $value;
+            }
+
+            $result .= ",\n";
+        }
+
+        $result .= str_repeat('    ', $indent - 1) . ']';
+        return $result;
+    }
+
+    /**
+     * Check if array is associative
+     */
+    private static function isAssociativeArray(array $array): bool
+    {
+        if (empty($array)) {
+            return false;
+        }
+        return array_keys($array) !== range(0, count($array) - 1);
     }
 }

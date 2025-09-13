@@ -59,11 +59,20 @@ class TranslationController extends Controller
     {
         $item = Translation::find($id);
 
-        if (!$item->id) {
+        if (!$item || !$item->id) {
             return redirect(route('localization.jawab.translation.index', session()->get('query')));
         }
 
-        return view('localization::translation.edit')->with('item', $item);
+        // Create a mock paginator object for the layout
+        $data = new class {
+            public function total() {
+                return \Jawabapp\Localization\Models\Translation::count();
+            }
+        };
+
+        return view('localization::translation.edit')
+            ->with('item', $item)
+            ->with('data', $data);
     }
 
     public function update(Request $request, $id)

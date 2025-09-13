@@ -129,7 +129,7 @@ class ExportTranslations extends Command
                 mkdir($langPath, 0755, true);
             }
 
-            $content = "<?php\n\nreturn " . var_export($phpTranslations, true) . ";\n";
+            $content = "<?php\n\nreturn " . $this->arrayToString($phpTranslations) . ";\n";
             file_put_contents("{$langPath}/{$group}.php", $content);
         }
     }
@@ -147,7 +147,7 @@ class ExportTranslations extends Command
 
         foreach ($translations as $group => $items) {
             $filePath = "{$langPath}/{$group}.php";
-            $content = "<?php\n\nreturn " . var_export($items, true) . ";\n";
+            $content = "<?php\n\nreturn " . $this->arrayToString($items) . ";\n";
             file_put_contents($filePath, $content);
             $this->line("  - Exported: {$filePath}");
         }
@@ -191,5 +191,51 @@ class ExportTranslations extends Command
         }
 
         $array[array_shift($keys)] = $value;
+    }
+
+    /**
+     * Convert array to string with bracket syntax
+     */
+    private function arrayToString(array $array, int $indent = 1): string
+    {
+        $isAssoc = $this->isAssociativeArray($array);
+        $indentStr = str_repeat('    ', $indent);
+        $result = '[' . "\n";
+
+        foreach ($array as $key => $value) {
+            $result .= $indentStr;
+
+            if ($isAssoc) {
+                $result .= "'" . addslashes($key) . "' => ";
+            }
+
+            if (is_array($value)) {
+                $result .= $this->arrayToString($value, $indent + 1);
+            } elseif (is_string($value)) {
+                $result .= "'" . addslashes($value) . "'";
+            } elseif (is_null($value)) {
+                $result .= 'null';
+            } elseif (is_bool($value)) {
+                $result .= $value ? 'true' : 'false';
+            } else {
+                $result .= $value;
+            }
+
+            $result .= ",\n";
+        }
+
+        $result .= str_repeat('    ', $indent - 1) . ']';
+        return $result;
+    }
+
+    /**
+     * Check if array is associative
+     */
+    private function isAssociativeArray(array $array): bool
+    {
+        if (empty($array)) {
+            return false;
+        }
+        return array_keys($array) !== range(0, count($array) - 1);
     }
 }
