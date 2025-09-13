@@ -20,7 +20,20 @@ class Translator extends BaseTranslator
             return $this->makeReplacements($translation, $replace);
         }
 
-        // Fallback to default Laravel translation
+        // Try to get from parent (files)
+        $fileTranslation = parent::get($key, $replace, $locale, false);
+
+        // If translation is found in files, return it
+        if ($fileTranslation !== $key) {
+            return $fileTranslation;
+        }
+
+        // Auto-create missing key if enabled
+        if (config('localization.database_translations.auto_create_keys', false)) {
+            $this->createMissingTranslationKey($key, $locale);
+        }
+
+        // Final fallback
         return parent::get($key, $replace, $locale, $fallback);
     }
 
@@ -29,7 +42,7 @@ class Translator extends BaseTranslator
      */
     protected function getFromDatabase(string $key, string $locale): ?string
     {
-        if (!config('localization.cache.enabled', true)) {
+        if (!config('localization.database_translations.enabled', true)) {
             return null;
         }
 
@@ -111,6 +124,48 @@ class Translator extends BaseTranslator
                 ->exists();
         } catch (\Exception $e) {
             return false;
+        }
+    }
+
+    /**
+     * Create a missing translation key in the database
+     */
+    protected function createMissingTranslationKey(string $key, string $locale): void
+    {
+        try {
+            // Parse the key to get group and actual key
+            if (strpos($key, '.') !== false) {
+                [$group, $itemKey] = explode('.', $key, 2);
+            } else {
+                $group = '__JSON__';
+                $itemKey = $key;
+            }
+
+            // Check if key already exists to avoid duplicates
+            $exists = \Jawabapp\Localization\Models\Translation::locale($locale)
+                ->group($group)
+                ->where('key', $itemKey)
+                ->exists();
+
+            if (!$exists) {
+                \Jawabapp\Localization\Models\Translation::create([
+                    'locale' => $locale,
+                    'group' => $group,
+                    'key' => $itemKey,
+                    'value' => $key, // Use the full key as initial value
+                    'metadata' => json_encode(['auto_created' => true, 'created_at' => now()->toISOString()])
+                ]);
+
+                // Log the creation if debugging is enabled
+                if (config('localization.fallback.log_missing', false)) {
+                    \Log::info("Auto-created translation key: {$key} for locale: {$locale}");
+                }
+            }
+        } catch (\Exception $e) {
+            // Silently fail if database operations fail
+            if (config('localization.fallback.log_missing', false)) {
+                \Log::error("Failed to auto-create translation key: {$key} for locale: {$locale}. Error: " . $e->getMessage());
+            }
         }
     }
 }

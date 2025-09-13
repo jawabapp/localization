@@ -55,6 +55,9 @@ class LocalizationServiceProvider extends ServiceProvider
 
         // Register middleware aliases for Laravel 11+
         $this->registerMiddlewareAliases();
+
+        // Override translator after boot
+        $this->overrideTranslator();
     }
 
     /**
@@ -68,6 +71,22 @@ class LocalizationServiceProvider extends ServiceProvider
         // Register the main class to use with the facade
         $this->app->singleton('localization', function ($app) {
             return new Libraries\Localization();
+        });
+
+        // Schedule translator override to happen after all providers are registered
+        $this->app->booted(function ($app) {
+            if (config('localization.database_translations.enabled', true)) {
+                $loader = $app['translation.loader'];
+                $locale = $app->getLocale();
+
+                $customTranslator = new Translation\Translator($loader, $locale);
+                $customTranslator->setFallback($app->getFallbackLocale());
+
+                // Override the translator binding
+                $app->singleton('translator', function () use ($customTranslator) {
+                    return $customTranslator;
+                });
+            }
         });
     }
 
@@ -151,6 +170,25 @@ class LocalizationServiceProvider extends ServiceProvider
             $this->app['router']->aliasMiddleware('localization.web', \Jawabapp\Localization\Http\Middleware\Web\Localization::class);
             $this->app['router']->aliasMiddleware('localization.api', \Jawabapp\Localization\Http\Middleware\Api\Localization::class);
             $this->app['router']->aliasMiddleware('localization', \Jawabapp\Localization\Http\Middleware\Web\Localization::class);
+        }
+    }
+
+    /**
+     * Override the default translator with our custom one
+     */
+    private function overrideTranslator(): void
+    {
+        if (config('localization.database_translations.enabled', true)) {
+            $loader = $this->app['translation.loader'];
+            $locale = $this->app->getLocale();
+
+            $customTranslator = new Translation\Translator($loader, $locale);
+            $customTranslator->setFallback($this->app->getFallbackLocale());
+
+            // Force override the translator binding
+            $this->app->singleton('translator', function () use ($customTranslator) {
+                return $customTranslator;
+            });
         }
     }
 
