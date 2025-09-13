@@ -3,6 +3,7 @@
 namespace Jawabapp\Localization;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Translation\FileLoader;
 use Illuminate\Translation\TranslationServiceProvider as BaseTranslationServiceProvider;
 use Jawabapp\Localization\Translation\DatabaseTranslationLoader;
 use Jawabapp\Localization\Translation\Translator;
@@ -15,7 +16,12 @@ class TranslationServiceProvider extends BaseTranslationServiceProvider
     protected function registerLoader(): void
     {
         $this->app->singleton('translation.loader', function ($app) {
-            return new DatabaseTranslationLoader($app['files'], $app['path.lang']);
+            // Only use database loader if enabled, otherwise use default file loader
+            if ($app['config']->get('localization.database_translations.enabled', true)) {
+                return new DatabaseTranslationLoader($app['files'], $app['path.lang']);
+            }
+
+            return new FileLoader($app['files'], $app['path.lang']);
         });
     }
 

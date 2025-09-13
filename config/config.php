@@ -129,6 +129,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Database Translation Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Enable or disable database-driven translations. When enabled, the package
+    | will check the database first for translations before falling back to files.
+    |
+    */
+    'database_translations' => [
+        'enabled' => true, // Enable database translations
+        'fallback_to_files' => true, // Fallback to file translations if database fails
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Export Configuration
     |--------------------------------------------------------------------------
     |

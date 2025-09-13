@@ -14,12 +14,14 @@ A comprehensive, modern Laravel package for managing multilingual applications w
 - 🎯 **Smart Locale Detection**: Browser, URL, session, and cookie-based detection
 - 📁 **Modern Laravel Compatibility**: Laravel 10/11 `lang/` directory structure
 - 🗂️ **Dual Format Support**: Both PHP arrays and JSON translations
+- 🗃️ **Database-Driven Translations**: Store translations in database with file fallback
 - 🎛️ **Professional Admin Interface**: Beautiful Tailwind CSS interface
 - ⚡ **Performance Optimized**: Built-in caching and file-based translations
 - 🔧 **Artisan Commands**: CLI tools for import/export and management
 - 🛣️ **SEO Friendly**: Automatic hreflang tags and localized URLs
 - 📱 **API Support**: RESTful API with intelligent locale detection
 - 🔄 **Hot Reloading**: Automatic file export on database changes
+- 🔀 **Flexible Loading**: Database-first with automatic file fallback
 
 ## 📋 Requirements
 
@@ -83,6 +85,53 @@ public function boot(): void
 ### 5. Access the Admin Interface
 
 Visit `/localization` in your browser to manage translations!
+
+## 🗃️ Database-Driven Translations
+
+The package automatically uses database-driven translations with file fallback. This means:
+
+- ✅ **Primary**: Translations are loaded from the database first
+- ✅ **Fallback**: If database is unavailable, files are used automatically
+- ✅ **Performance**: Results are cached for optimal performance
+- ✅ **Flexibility**: You can disable database translations if needed
+
+### Configuration
+
+Control database translations in `config/localization.php`:
+
+```php
+'database_translations' => [
+    'enabled' => true, // Enable database translations
+    'fallback_to_files' => true, // Fallback to file translations if database fails
+],
+```
+
+### How It Works
+
+1. **Translation Request**: When you call `__('messages.welcome')` or `trans('auth.failed')`
+2. **Database Check**: Package checks the database for the translation first
+3. **File Fallback**: If not found in database, loads from `lang/` files
+4. **Caching**: Results are cached to avoid repeated database queries
+5. **Admin Interface**: Manage all translations through the web interface at `/localization`
+
+### Automatic Setup
+
+The database translation system is **automatically configured** when you install the package:
+
+- 🔧 **Auto-Discovery**: Laravel automatically registers the `TranslationServiceProvider`
+- 🔄 **Seamless Integration**: Replaces Laravel's default translator with our enhanced version
+- 📊 **No Code Changes**: Your existing `__()` and `trans()` calls work unchanged
+- 🛡️ **Safe Fallback**: If database fails, translations load from files automatically
+
+### Disabling Database Translations
+
+To use only file-based translations, set in your config:
+
+```php
+'database_translations' => [
+    'enabled' => false, // Disable database translations - use files only
+],
+```
 
 ## ⚙️ Configuration
 

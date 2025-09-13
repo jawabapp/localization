@@ -79,7 +79,8 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Jawabapp\\Localization\\LocalizationServiceProvider"
+                "Jawabapp\\Localization\\LocalizationServiceProvider",
+                "Jawabapp\\Localization\\TranslationServiceProvider"
             ],
             "aliases": {
                 "Localization": "Jawabapp\\Localization\\Facades\\Localization"
