@@ -46,11 +46,15 @@ class LocalizationServiceProvider extends ServiceProvider
                 ImportTranslations::class,
                 SyncTranslations::class,
                 ClearTranslationsCache::class,
+                Console\Commands\ValidateConfiguration::class,
             ]);
         }
 
         // Add route macro for localized routes
         $this->registerRouteMacros();
+
+        // Register middleware aliases for Laravel 11+
+        $this->registerMiddlewareAliases();
     }
 
     /**
@@ -62,14 +66,9 @@ class LocalizationServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/config.php', 'localization');
 
         // Register the main class to use with the facade
-        $this->app->singleton('localization', function () {
-            return new Localization();
+        $this->app->singleton('localization', function ($app) {
+            return new Libraries\Localization();
         });
-
-        // Register custom translator if needed
-        if (config('localization.use_database_translations', true)) {
-            $this->app->register(TranslationServiceProvider::class);
-        }
     }
 
     /**
@@ -140,6 +139,19 @@ class LocalizationServiceProvider extends ServiceProvider
 
             return route("{$locale}.{$name}", $parameters);
         });
+    }
+
+    /**
+     * Register middleware aliases for Laravel 11+
+     */
+    private function registerMiddlewareAliases(): void
+    {
+        // Check if we're in Laravel 11+ and register middleware aliases
+        if (method_exists($this->app['router'], 'aliasMiddleware')) {
+            $this->app['router']->aliasMiddleware('localization.web', \Jawabapp\Localization\Http\Middleware\Web\Localization::class);
+            $this->app['router']->aliasMiddleware('localization.api', \Jawabapp\Localization\Http\Middleware\Api\Localization::class);
+            $this->app['router']->aliasMiddleware('localization', \Jawabapp\Localization\Http\Middleware\Web\Localization::class);
+        }
     }
 
     /**

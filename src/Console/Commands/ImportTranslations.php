@@ -188,9 +188,71 @@ class ImportTranslations extends Command
      */
     private function deleteMissingTranslations(string $locale): void
     {
-        // This is a placeholder for the delete missing functionality
-        // Implementation would require tracking which translations were imported
-        // and deleting any that weren't found in the files
-        $this->warn('Delete missing translations functionality is not yet implemented.');
+        $this->line("Checking for translations to delete in locale: {$locale}");
+
+        // Get all existing keys in database for this locale
+        $existingTranslations = Translation::locale($locale)->get(['id', 'group', 'key']);
+
+        if ($existingTranslations->isEmpty()) {
+            return;
+        }
+
+        $fileKeys = [];
+
+        // Collect keys from PHP files
+        $langPath = app()->langPath() . "/{$locale}";
+        if (file_exists($langPath)) {
+            $phpFiles = glob("{$langPath}/*.php");
+            foreach ($phpFiles as $file) {
+                $group = basename($file, '.php');
+                $translations = include $file;
+                if (is_array($translations)) {
+                    $this->collectKeysFromArray($translations, $fileKeys, $group);
+                }
+            }
+        }
+
+        // Collect keys from JSON file
+        $jsonFile = app()->langPath() . "/{$locale}.json";
+        if (file_exists($jsonFile)) {
+            $jsonTranslations = json_decode(file_get_contents($jsonFile), true);
+            if (is_array($jsonTranslations)) {
+                foreach (array_keys($jsonTranslations) as $key) {
+                    $fileKeys["__JSON__.{$key}"] = true;
+                }
+            }
+        }
+
+        // Find translations to delete
+        $toDelete = [];
+        foreach ($existingTranslations as $translation) {
+            $key = "{$translation->group}.{$translation->key}";
+            if (!isset($fileKeys[$key])) {
+                $toDelete[] = $translation->id;
+            }
+        }
+
+        if (!empty($toDelete)) {
+            $deletedCount = Translation::whereIn('id', $toDelete)->delete();
+            $this->line("  - Deleted {$deletedCount} missing translations");
+        } else {
+            $this->line("  - No missing translations to delete");
+        }
+    }
+
+    /**
+     * Recursively collect keys from translation array
+     */
+    private function collectKeysFromArray(array $translations, array &$fileKeys, string $group, string $prefix = ''): void
+    {
+        foreach ($translations as $key => $value) {
+            $fullKey = $prefix ? "{$prefix}.{$key}" : $key;
+
+            if (is_array($value)) {
+                $this->collectKeysFromArray($value, $fileKeys, $group, $fullKey);
+            } else {
+                $fileKeys["{$group}.{$fullKey}"] = true;
+            }
+        }
     }
 }

@@ -98,8 +98,33 @@ class TranslationController extends Controller
 
     public function generate(Request $request)
     {
-        Localization::exportTranslations();
+        // Get translation count for the layout - create a mock paginator object
+        $data = new class {
+            public function total() {
+                return \Jawabapp\Localization\Models\Translation::count();
+            }
+        };
 
-        return view('localization::translation.generate');
+        if ($request->isMethod('POST')) {
+            // Handle form submission - export with specific options
+            $validated = $request->validate([
+                'format' => 'array',
+                'format.*' => 'in:php,json',
+                'locales' => 'array',
+                'locales.*' => 'string',
+                'groups' => 'array',
+                'groups.*' => 'string',
+            ]);
+
+            // TODO: Use the form parameters to customize export
+            // For now, just export all translations
+            Localization::exportTranslations();
+
+            return redirect()->route('localization.jawab.translation.generate')
+                ->with('success', 'Translations exported successfully!');
+        }
+
+        // Handle GET request - show the form
+        return view('localization::translation.generate')->with('data', $data);
     }
 }

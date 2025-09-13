@@ -403,7 +403,7 @@
 
 <script>
 function toggleSelectAll() {
-    const allItems = @json($data->items()->pluck('id'));
+    const allItems = @json(collect($data->items())->pluck('id'));
     if (this.selectAll) {
         this.selectedItems = allItems;
     } else {

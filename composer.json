@@ -1,9 +1,17 @@
 {
     "name": "jawabapp/localization",
-    "description": "Localization its a package  to translate website from the admin area",
+    "description": "A comprehensive, modern Laravel package for managing multilingual applications with database-driven translations, automatic locale detection, and a beautiful admin interface.",
     "keywords": [
         "jawabapp",
-        "localization"
+        "localization",
+        "laravel",
+        "translations",
+        "i18n",
+        "multilingual",
+        "locale",
+        "admin-panel",
+        "database-translations",
+        "laravel-package"
     ],
     "homepage": "https://github.com/jawabapp/localization",
     "license": "MIT",
@@ -12,21 +20,33 @@
         {
             "name": "Ibraheem Qanah",
             "email": "i.qanah@gmail.com",
-            "role": "Developer"
+            "role": "Developer",
+            "homepage": "https://github.com/jawabapp"
         }
     ],
     "require": {
         "php": "^8.2",
-        "illuminate/support": "^10.0|^11.0|^12.0"
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "illuminate/database": "^10.0|^11.0|^12.0",
+        "illuminate/translation": "^10.0|^11.0|^12.0",
+        "illuminate/console": "^10.0|^11.0|^12.0",
+        "illuminate/http": "^10.0|^11.0|^12.0",
+        "ext-mbstring": "*",
+        "ext-json": "*"
     },
     "require-dev": {
         "orchestra/testbench": "^8.0|^9.0|^10.0",
-        "phpunit/phpunit": "^10.0|^11.0|^12.0"
+        "phpunit/phpunit": "^10.0|^11.0|^12.0",
+        "mockery/mockery": "^1.6",
+        "fakerphp/faker": "^1.23"
     },
     "autoload": {
         "psr-4": {
             "Jawabapp\\Localization\\": "src"
-        }
+        },
+        "files": [
+            "src/helpers.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
@@ -35,20 +55,40 @@
     },
     "scripts": {
         "test": "vendor/bin/phpunit",
-        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
-
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage",
+        "analyse": "vendor/bin/phpstan analyse",
+        "format": "vendor/bin/php-cs-fixer fix"
     },
     "config": {
-        "sort-packages": true
+        "sort-packages": true,
+        "allow-plugins": {
+            "composer/package-versions-deprecated": true
+        }
     },
+    "support": {
+        "issues": "https://github.com/jawabapp/localization/issues",
+        "source": "https://github.com/jawabapp/localization",
+        "docs": "https://github.com/jawabapp/localization/wiki"
+    },
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/jawabapp"
+        }
+    ],
     "extra": {
         "laravel": {
             "providers": [
                 "Jawabapp\\Localization\\LocalizationServiceProvider"
             ],
             "aliases": {
-                "Localization": "Jawabapp\\Localization\\LocalizationFacade"
+                "Localization": "Jawabapp\\Localization\\Facades\\Localization"
             }
+        },
+        "branch-alias": {
+            "dev-master": "2.x-dev"
         }
-    }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true}
 }

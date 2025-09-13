@@ -60,7 +60,7 @@ return [
     'routes' => [
         'enabled' => true,
         'prefix' => 'localization',
-        'middleware' => ['web', 'auth'],
+        'middleware' => ['web'],
         'as' => 'localization.',
     ],
 
@@ -97,6 +97,7 @@ return [
         'forms',
         'emails',
         'notifications',
+        'public',
     ],
 
     /*

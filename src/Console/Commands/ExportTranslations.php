@@ -63,6 +63,10 @@ class ExportTranslations extends Command
             throw new \InvalidArgumentException("Locale '{$locale}' is not supported.");
         }
 
+        if (!in_array($format, ['php', 'json', 'both'])) {
+            throw new \InvalidArgumentException("Format '{$format}' is not supported. Use php, json, or both.");
+        }
+
         $this->line("Exporting translations for locale: {$locale}");
 
         // Get translations for this locale
