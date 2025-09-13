@@ -11,21 +11,14 @@ use Jawabapp\Localization\Translation\Translator;
 class TranslationServiceProvider extends BaseTranslationServiceProvider
 {
     /**
-     * Boot the service provider
-     */
-    public function boot(): void
-    {
-        parent::boot();
-    }
-
-    /**
      * Register the service provider
      */
     public function register(): void
     {
         parent::register();
 
-        // Re-register our custom translator to override Laravel's
+        // Override with our custom components
+        $this->registerLoader();
         $this->registerTranslator();
     }
     /**
