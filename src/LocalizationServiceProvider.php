@@ -4,70 +4,78 @@ namespace Jawabapp\Localization;
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Jawabapp\Localization\Console\Commands\ExportTranslations;
+use Jawabapp\Localization\Console\Commands\ImportTranslations;
+use Jawabapp\Localization\Console\Commands\SyncTranslations;
+use Jawabapp\Localization\Console\Commands\ClearTranslationsCache;
 
 class LocalizationServiceProvider extends ServiceProvider
 {
     /**
      * Bootstrap the application services.
      */
-    public function boot()
+    public function boot(): void
     {
-        /*
-         * Optional methods to load your package assets
-         */
-        // $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'localization');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'localization');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
-        $this->registerRoutes();
+
+        if (config('localization.routes.enabled', true)) {
+            $this->registerRoutes();
+        }
 
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__.'/../config/config.php' => config_path('localization.php'),
             ], 'localization-config');
 
-            // Publishing the views.
-            /*$this->publishes([
-                __DIR__.'/../resources/views' => resource_path('views/vendor/localization'),
-            ], 'views');*/
-
-            // Publishing assets.
             $this->publishes([
                 __DIR__.'/../public' => public_path('vendor/localization'),
             ], 'localization-assets');
 
-            // Publishing the translation files.
-            /*$this->publishes([
-                __DIR__.'/../resources/lang' => resource_path('lang/vendor/localization'),
-            ], 'lang');*/
+            $this->publishes([
+                __DIR__.'/../database/migrations' => database_path('migrations'),
+            ], 'localization-migrations');
 
-            // Registering package commands.
-            // $this->commands([]);
+            $this->publishes([
+                __DIR__.'/../resources/views' => resource_path('views/vendor/localization'),
+            ], 'localization-views');
+
+            // Register commands
+            $this->commands([
+                ExportTranslations::class,
+                ImportTranslations::class,
+                SyncTranslations::class,
+                ClearTranslationsCache::class,
+            ]);
         }
+
+        // Add route macro for localized routes
+        $this->registerRouteMacros();
     }
 
     /**
      * Register the application services.
      */
-    public function register()
+    public function register(): void
     {
-        // Automatically apply the package configuration
+        // Merge config
         $this->mergeConfigFrom(__DIR__.'/../config/config.php', 'localization');
 
         // Register the main class to use with the facade
         $this->app->singleton('localization', function () {
-            return new Localization;
+            return new Localization();
         });
 
-        $this->app->register(TranslationServiceProvider::class);
-
+        // Register custom translator if needed
+        if (config('localization.use_database_translations', true)) {
+            $this->app->register(TranslationServiceProvider::class);
+        }
     }
 
     /**
      * Register the package routes.
-     *
-     * @return void
      */
-    private function registerRoutes()
+    private function registerRoutes(): void
     {
         Route::group($this->routeConfiguration(), function () {
             $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
@@ -75,17 +83,70 @@ class LocalizationServiceProvider extends ServiceProvider
     }
 
     /**
-     * Get the Telescope route group configuration array.
-     *
-     * @return array
+     * Get the route group configuration array.
      */
-    private function routeConfiguration()
+    private function routeConfiguration(): array
     {
         return [
             'prefix' => config('localization.routes.prefix', 'localization'),
-            'middleware' => config('localization.routes.middleware', 'auth.session'),
+            'middleware' => config('localization.routes.middleware', ['web', 'auth']),
+            'as' => config('localization.routes.as', 'localization.'),
         ];
     }
 
+    /**
+     * Register route macros for localized routes
+     */
+    private function registerRouteMacros(): void
+    {
+        // Macro for creating localized route groups
+        Route::macro('localized', function ($callback) {
+            $locales = config('localization.supported_locales', ['en']);
+            $hideDefault = config('localization.url.hide_default', true);
+            $defaultLocale = config('app.fallback_locale', 'en');
 
+            foreach ($locales as $locale) {
+                if ($hideDefault && $locale === $defaultLocale) {
+                    // Default locale without prefix
+                    Route::group([
+                        'middleware' => ['localization'],
+                    ], function () use ($callback, $locale) {
+                        app()->setLocale($locale);
+                        $callback($locale);
+                    });
+                } else {
+                    // Other locales with prefix
+                    Route::group([
+                        'prefix' => $locale,
+                        'middleware' => ['localization'],
+                        'as' => "{$locale}.",
+                    ], function () use ($callback, $locale) {
+                        app()->setLocale($locale);
+                        $callback($locale);
+                    });
+                }
+            }
+        });
+
+        // Macro for getting localized route URL
+        Route::macro('localizedUrl', function ($name, $locale = null, $parameters = []) {
+            $locale = $locale ?? app()->getLocale();
+            $hideDefault = config('localization.url.hide_default', true);
+            $defaultLocale = config('app.fallback_locale', 'en');
+
+            if ($hideDefault && $locale === $defaultLocale) {
+                return route($name, $parameters);
+            }
+
+            return route("{$locale}.{$name}", $parameters);
+        });
+    }
+
+    /**
+     * Get the services provided by the provider.
+     */
+    public function provides(): array
+    {
+        return ['localization'];
+    }
 }

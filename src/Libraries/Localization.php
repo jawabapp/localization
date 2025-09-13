@@ -1,261 +1,495 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: qanah
- * Date: 10/31/17
- * Time: 8:59 PM
- */
 
 namespace Jawabapp\Localization\Libraries;
 
 use Jawabapp\Localization\Models\Translation;
-use App;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Cache;
 
 class Localization
 {
-    public static function routePrefix($locale = null) {
-
-        $currentLocale = null;
-
+    /**
+     * Get route prefix based on locale
+     */
+    public static function routePrefix($locale = null): ?string
+    {
         if (empty($locale) || !is_string($locale)) {
             $locale = request()->segment(1);
         }
 
-        if (array_key_exists($locale, config('localization.locales', []))) {
-            $currentLocale = $locale;
-        } else {
-            $locale = null;
-            $currentLocale = config('app.fallback_locale');
+        $supportedLocales = config('localization.supported_locales', []);
+
+        if (in_array($locale, $supportedLocales)) {
+            App::setLocale($locale);
+            return $locale;
         }
 
-        App::setLocale($currentLocale);
+        // Try to detect best locale
+        $detectedLocale = self::detectLocale();
+        App::setLocale($detectedLocale);
 
-        return $locale;
+        return $detectedLocale !== config('app.fallback_locale') ? $detectedLocale : null;
     }
 
-    public static function generate($class, &$attributes, $old = null)
+    /**
+     * Detect the best locale for the user
+     */
+    public static function detectLocale(): string
     {
-        $generate = false;
+        // Check session
+        if (session()->has('locale')) {
+            $sessionLocale = session('locale');
+            if (in_array($sessionLocale, config('localization.supported_locales', []))) {
+                return $sessionLocale;
+            }
+        }
 
+        // Check browser accept language
+        if (config('localization.detect_browser_locale', true)) {
+            $browserLocale = self::detectBrowserLocale();
+            if ($browserLocale) {
+                return $browserLocale;
+            }
+        }
+
+        return config('app.fallback_locale', 'en');
+    }
+
+    /**
+     * Detect browser preferred locale
+     */
+    private static function detectBrowserLocale(): ?string
+    {
+        $acceptLanguage = request()->server('HTTP_ACCEPT_LANGUAGE');
+        if (!$acceptLanguage) {
+            return null;
+        }
+
+        $supportedLocales = config('localization.supported_locales', []);
+
+        // Parse Accept-Language header
+        preg_match_all('/([a-z]{1,8}(-[a-z]{1,8})?)\s*(;\s*q\s*=\s*(1|0\.[0-9]+))?/i', $acceptLanguage, $matches);
+
+        if (count($matches[1])) {
+            $languages = array_combine($matches[1], $matches[4]);
+
+            foreach ($languages as $lang => $priority) {
+                $languages[$lang] = $priority ?: 1;
+            }
+
+            arsort($languages, SORT_NUMERIC);
+
+            foreach ($languages as $lang => $priority) {
+                $lang = substr($lang, 0, 2); // Get language code without region
+                if (in_array($lang, $supportedLocales)) {
+                    return $lang;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Set the application locale
+     */
+    public static function setLocale(string $locale): void
+    {
+        if (in_array($locale, config('localization.supported_locales', []))) {
+            App::setLocale($locale);
+            session(['locale' => $locale]);
+        }
+    }
+
+    /**
+     * Get all supported locales
+     */
+    public static function getSupportedLocales(): array
+    {
+        return config('localization.supported_locales', ['en']);
+    }
+
+    /**
+     * Get locale native name
+     */
+    public static function getLocaleName(string $locale): string
+    {
+        $names = config('localization.locale_names', []);
+        return $names[$locale] ?? strtoupper($locale);
+    }
+
+    /**
+     * Generate translation keys for model attributes
+     */
+    public static function generate($class, &$attributes, $old = null): void
+    {
+        $shouldExport = false;
         $key = uniqid();
 
-        foreach ($attributes as $filed => $value) {
-            if (preg_match('/_key$/', $filed)) {
-                if($value) {
-                    $attributes[$filed] = empty($old[$filed]) ? self::getTranslationKey($class, $filed, $key) : $old[$filed];
+        foreach ($attributes as $field => $value) {
+            if (preg_match('/_key$/', $field)) {
+                if ($value) {
+                    $attributes[$field] = empty($old[$field])
+                        ? self::getTranslationKey($class, $field, $key)
+                        : $old[$field];
 
-                    self::addKeyToTranslation($attributes[$filed], $value);
-
-                    $generate = true;
+                    self::addKeyToTranslation($attributes[$field], $value);
+                    $shouldExport = true;
                 } else {
-                    $attributes[$filed] = '';
+                    $attributes[$field] = '';
 
-                    if(!empty($old[$filed])) {
-                        try {
-                            Translation::where('key', $old[$filed])->delete();
-                        } catch (\Exception $e) {
-                        }
-
-                        $generate = true;
+                    if (!empty($old[$field])) {
+                        Translation::where('key', $old[$field])->delete();
+                        $shouldExport = true;
                     }
                 }
             }
         }
 
-        if ($generate && !App::runningInConsole())
-        {
+        if ($shouldExport && !App::runningInConsole()) {
             self::exportTranslations();
         }
     }
 
-    public static function delete($old) {
+    /**
+     * Delete translation keys for model
+     */
+    public static function delete($old): void
+    {
+        $shouldExport = false;
 
-        $generate = false;
-
-        foreach ($old as $filed => $value) {
-            if (preg_match('/_key$/', $filed)) {
-                try {
-                    Translation::where('key', $old[$filed])->delete();
-                } catch (\Exception $e) {
-                }
-
-                $generate = true;
+        foreach ($old as $field => $value) {
+            if (preg_match('/_key$/', $field) && $value) {
+                Translation::where('key', $value)->delete();
+                $shouldExport = true;
             }
         }
 
-        if ($generate && !App::runningInConsole())
-        {
+        if ($shouldExport && !App::runningInConsole()) {
             self::exportTranslations();
         }
     }
 
-    public static function addKeyToTranslation($key, $value = null, $languageCode = null)
+    /**
+     * Add a translation key
+     */
+    public static function addKeyToTranslation($key, $value = null, $locale = null): bool
     {
-        $flag = false;
+        $locale = $locale ?? App::getLocale();
 
-        if(is_null($languageCode)) {
-            $languageCode = 'en';
+        [$namespace, $group, $item] = app('translator')->parseKey($key);
+
+        if (!in_array($group, config('localization.translation_groups', []))) {
+            return false;
         }
 
-        list($namespace, $group, $item) = app('translator')->parseKey($key);
+        Translation::updateOrCreate(
+            [
+                'key' => $key,
+                'locale' => $locale,
+            ],
+            [
+                'value' => $value ?? $item,
+                'group' => $group,
+            ]
+        );
 
-        if(in_array($group, config('localization.groups', []))) {
-            $flag = true;
-        }
+        // Clear translation cache
+        Cache::forget("translations.{$locale}");
 
-        if($flag) {
-
-            // check if translation not exists
-            $existsTransKey = Translation::where('key', $key)->where('language_code', $languageCode)->first();
-            if(!$existsTransKey) {
-                Translation::create([
-                    'key' => $key,
-                    'language_code' => $languageCode,
-                    'value' => $value ?? $item
-                ]);
-            } else {
-                if(isset($value)) {
-                    $existsTransKey->value = $value;
-                    $existsTransKey->save();
-                }
-            }
-        }
-
-        return $flag;
+        return true;
     }
 
-    public static function getTranslationFileName($class)
+    /**
+     * Get translation file name for a model class
+     */
+    public static function getTranslationFileName($class): string
     {
-        return 'db_' . strtolower(str_replace('App\\Models\\', '', $class));
+        return 'db_' . strtolower(class_basename($class));
     }
 
-    private static function getTranslationKey($class, $filed, $key)
+    /**
+     * Get translation key for a model field
+     */
+    private static function getTranslationKey($class, $field, $key): string
     {
-        return self::getTranslationFileName($class) . '.' . $filed . '_' . $key;
+        return self::getTranslationFileName($class) . '.' . $field . '_' . $key;
     }
 
-    public static function exportTranslations()
+    /**
+     * Export all translations to files
+     */
+    public static function exportTranslations(): void
     {
+        $locales = config('localization.supported_locales', ['en']);
 
-        $languages = array();
+        foreach ($locales as $locale) {
+            $translations = Translation::where('locale', $locale)->get();
 
-        foreach (config('localization.locales') as $code => $locale) {
-
-            $translations = Translation::where('language_code', $code)->get();
+            $phpTranslations = [];
+            $jsonTranslations = [];
 
             foreach ($translations as $translation) {
-                $languages[$code][$translation->key] = $translation->value;
-            }
-        }
-
-        foreach ($languages as $code => $language) {
-            self::exportPHPTranslation($code, $language);
-            //self::exportJSTranslation($code, $language);
-        }
-
-    }
-
-    private static function exportPHPTranslation($code, array $language) {
-
-        $langPath = App::langPath() . DIRECTORY_SEPARATOR . $code . DIRECTORY_SEPARATOR;
-
-        $db_trans = $language['db'] ?? [];
-
-        if(isset($language['db'])) {
-            unset($language['db']);
-        }
-
-        $language += $db_trans;
-
-        /*
-         * export trans
-         */
-        $translations = [];
-
-        foreach ($language as $key => $value) {
-            self::getFolder($translations, $key, $value);
-        }
-
-        foreach ($translations as $group => $trans) {
-            if($group == 'validation') {
-                self::prepareValidationArray($trans);
+                if ($translation->group === '__JSON__') {
+                    $jsonTranslations[$translation->key] = $translation->value;
+                } else {
+                    self::arraySet($phpTranslations, "{$translation->group}.{$translation->key}", $translation->value);
+                }
             }
 
-            self::exportPHP($langPath . $group . '.php', $trans);
-        }
-    }
-
-    private static function exportPHP($fullPath, array $trans) {
-
-        if (!is_dir(dirname($fullPath))) {
-            mkdir(dirname($fullPath), 0777, true);
-        }
-
-        file_put_contents($fullPath, '<?php' . "\n\n" . 'return ' . var_export($trans, true) . ';');
-    }
-
-    private static function prepareValidationArray(array &$trans) {
-
-        foreach ($trans as $key => $value) {
-
-            $keys = explode('.', $key);
-
-            switch (count($keys)) {
-                case 2:
-                    list($k1, $k2) = $keys;
-                    $trans[$k1][$k2] = $value;
-                    unset($trans[$key]);
-                    break;
-                case 3:
-                    list($k1, $k2, $k3) = $keys;
-                    $trans[$k1][$k2][$k3] = $value;
-                    unset($trans[$key]);
-                    break;
+            // Export PHP translations
+            if (!empty($phpTranslations)) {
+                self::exportPHPTranslations($locale, $phpTranslations);
             }
 
+            // Export JSON translations
+            if (!empty($jsonTranslations)) {
+                self::exportJSONTranslations($locale, $jsonTranslations);
+            }
         }
-
     }
 
-    private static function exportJSTranslation($code, array $language) {
-
-        $langPath = base_path('public/js/locales') . DIRECTORY_SEPARATOR;
-
-        /*
-         * export db trans
-         */
-        $db_trans = $language['db'] ?? [];
-        self::exportJS($langPath . 'db_' . $code . '.js', $db_trans);
-
-        if(isset($language['db'])) {
-            unset($language['db']);
-        }
-
-        /*
-         * export static trans
-         */
-        $static_trans = $language ?? [];
-        self::exportJS($langPath . $code . '.js', $static_trans);
-    }
-
-    private static function exportJS($fullPath, array $trans) {
-
-        if (!is_dir(dirname($fullPath))) {
-            mkdir(dirname($fullPath), 0777, true);
-        }
-
-        file_put_contents($fullPath, "Object.assign(window.translations, " . json_encode($trans) . ");");
-    }
-
-    private static function getFolder(&$array, $key, $value)
+    /**
+     * Export PHP translation files
+     */
+    private static function exportPHPTranslations(string $locale, array $translations): void
     {
-        list($namespace, $group, $item) = app('translator')->parseKey($key);
+        $langPath = self::getLangPath($locale);
 
-        if($namespace == '*') {
-            $array[$group][$item] = $value;
-        } else {
-            #TODO namespace folder
+        foreach ($translations as $group => $items) {
+            $filePath = "{$langPath}/{$group}.php";
+
+            if (!File::isDirectory($langPath)) {
+                File::makeDirectory($langPath, 0755, true);
+            }
+
+            $content = "<?php\n\nreturn " . var_export($items, true) . ";\n";
+            File::put($filePath, $content);
         }
     }
 
+    /**
+     * Export JSON translation files
+     */
+    private static function exportJSONTranslations(string $locale, array $translations): void
+    {
+        $langPath = self::getLangPath();
+
+        if (!File::isDirectory($langPath)) {
+            File::makeDirectory($langPath, 0755, true);
+        }
+
+        $filePath = "{$langPath}/{$locale}.json";
+        File::put($filePath, json_encode($translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * Get the language path based on Laravel version
+     */
+    private static function getLangPath(?string $locale = null): string
+    {
+        // Laravel 9+ uses lang/ in root, older versions use resources/lang/
+        $basePath = App::langPath();
+
+        if ($locale) {
+            return "{$basePath}/{$locale}";
+        }
+
+        return $basePath;
+    }
+
+    /**
+     * Import translations from files
+     */
+    public static function importTranslations(): void
+    {
+        $locales = config('localization.supported_locales', ['en']);
+
+        foreach ($locales as $locale) {
+            // Import PHP translations
+            self::importPHPTranslations($locale);
+
+            // Import JSON translations
+            self::importJSONTranslations($locale);
+        }
+    }
+
+    /**
+     * Import PHP translation files
+     */
+    private static function importPHPTranslations(string $locale): void
+    {
+        $langPath = self::getLangPath($locale);
+
+        if (!File::isDirectory($langPath)) {
+            return;
+        }
+
+        $files = File::files($langPath);
+
+        foreach ($files as $file) {
+            if ($file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $group = $file->getFilenameWithoutExtension();
+            $translations = include $file->getPathname();
+
+            if (!is_array($translations)) {
+                continue;
+            }
+
+            self::importTranslationGroup($locale, $group, $translations);
+        }
+    }
+
+    /**
+     * Import JSON translation files
+     */
+    private static function importJSONTranslations(string $locale): void
+    {
+        $filePath = self::getLangPath() . "/{$locale}.json";
+
+        if (!File::exists($filePath)) {
+            return;
+        }
+
+        $translations = json_decode(File::get($filePath), true);
+
+        if (!is_array($translations)) {
+            return;
+        }
+
+        foreach ($translations as $key => $value) {
+            Translation::updateOrCreate(
+                [
+                    'locale' => $locale,
+                    'group' => '__JSON__',
+                    'key' => $key,
+                ],
+                [
+                    'value' => $value,
+                ]
+            );
+        }
+    }
+
+    /**
+     * Import a translation group
+     */
+    private static function importTranslationGroup(string $locale, string $group, array $translations, string $prefix = ''): void
+    {
+        foreach ($translations as $key => $value) {
+            $fullKey = $prefix ? "{$prefix}.{$key}" : $key;
+
+            if (is_array($value)) {
+                self::importTranslationGroup($locale, $group, $value, $fullKey);
+            } else {
+                Translation::updateOrCreate(
+                    [
+                        'locale' => $locale,
+                        'group' => $group,
+                        'key' => $fullKey,
+                    ],
+                    [
+                        'value' => $value,
+                    ]
+                );
+            }
+        }
+    }
+
+    /**
+     * Get available locales from the system
+     */
+    public static function getAvailableLocales(): array
+    {
+        $locales = [];
+        $langPath = self::getLangPath();
+
+        // Check for directories (PHP translations)
+        if (File::isDirectory($langPath)) {
+            $directories = File::directories($langPath);
+            foreach ($directories as $dir) {
+                $locales[] = basename($dir);
+            }
+
+            // Check for JSON files
+            $files = File::files($langPath);
+            foreach ($files as $file) {
+                if ($file->getExtension() === 'json') {
+                    $locale = $file->getFilenameWithoutExtension();
+                    if (!in_array($locale, $locales)) {
+                        $locales[] = $locale;
+                    }
+                }
+            }
+        }
+
+        return array_unique($locales);
+    }
+
+    /**
+     * Helper to set array values using dot notation
+     */
+    private static function arraySet(&$array, $key, $value): void
+    {
+        $keys = explode('.', $key);
+
+        while (count($keys) > 1) {
+            $key = array_shift($keys);
+
+            if (!isset($array[$key]) || !is_array($array[$key])) {
+                $array[$key] = [];
+            }
+
+            $array = &$array[$key];
+        }
+
+        $array[array_shift($keys)] = $value;
+    }
+
+    /**
+     * Get localized route
+     */
+    public static function localizedRoute(string $name, array $parameters = [], ?string $locale = null): string
+    {
+        $locale = $locale ?? App::getLocale();
+
+        if ($locale !== config('app.fallback_locale')) {
+            $parameters = array_merge(['locale' => $locale], $parameters);
+        }
+
+        return route($name, $parameters);
+    }
+
+    /**
+     * Get alternate locale URLs for SEO
+     */
+    public static function getAlternateUrls(): array
+    {
+        $urls = [];
+        $currentRoute = request()->route();
+
+        if (!$currentRoute) {
+            return $urls;
+        }
+
+        $currentParameters = $currentRoute->parameters();
+
+        foreach (self::getSupportedLocales() as $locale) {
+            $parameters = $currentParameters;
+
+            if ($locale !== config('app.fallback_locale')) {
+                $parameters['locale'] = $locale;
+            } else {
+                unset($parameters['locale']);
+            }
+
+            $urls[$locale] = url($currentRoute->uri(), $parameters);
+        }
+
+        return $urls;
+    }
 }
