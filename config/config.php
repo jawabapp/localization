@@ -140,6 +140,7 @@ return [
         'enabled' => true, // Enable database translations
         'fallback_to_files' => true, // Fallback to file translations if database fails
         'auto_create_keys' => true, // Automatically create missing translation keys
+        'auto_export_to_files' => false, // Automatically export new keys to language files
     ],
 
     /*
