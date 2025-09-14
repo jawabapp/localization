@@ -7,16 +7,24 @@ use Jawabapp\Localization\Libraries\Localization;
 
 class Translator extends BaseTranslator
 {
-    public function __construct($loader, $locale)
+    /**
+     * Handle a missing translation key.
+     *
+     * @param string $key
+     * @param array $replace
+     * @param string|null $locale
+     * @param bool $fallback
+     * @return string
+     */
+    protected function handleMissingTranslationKey($key, $replace, $locale, $fallback)
     {
-        parent::__construct($loader, $locale);
+        // Auto-create missing key if enabled
+        if (config('localization.database_translations.auto_create_keys', false)) {
+            $this->createMissingTranslationKey($key, $replace, $locale, $fallback);
+        }
 
-        $this->missingTranslationKeyCallback = function ($key, $replace, $locale, $fallback) {
-            // Auto-create missing key if enabled
-            if (config('localization.database_translations.auto_create_keys', false)) {
-                $this->createMissingTranslationKey($key, $replace, $locale, $fallback);
-            }
-        };
+        // Call parent implementation to maintain default Laravel behavior
+        return parent::handleMissingTranslationKey($key, $replace, $locale, $fallback);
     }
 
     /**
