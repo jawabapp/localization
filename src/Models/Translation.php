@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Cache;
  *
  * @property int $id
  * @property string $locale
+ * @property string|null $namespace
  * @property string $group
  * @property string $key
  * @property string|null $value
@@ -34,6 +35,7 @@ class Translation extends Model
      */
     protected $fillable = [
         'locale',
+        'namespace',
         'group',
         'key',
         'value',
@@ -108,6 +110,17 @@ class Translation extends Model
     public function scopeGroup(Builder $query, string $group): Builder
     {
         return $query->where('group', $group);
+    }
+
+    /**
+     * Scope to filter by namespace
+     */
+    public function scopeNamespace(Builder $query, ?string $namespace): Builder
+    {
+        if ($namespace === null || $namespace === '*') {
+            return $query->whereNull('namespace')->orWhere('namespace', '*');
+        }
+        return $query->where('namespace', $namespace);
     }
 
     /**
