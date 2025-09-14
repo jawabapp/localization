@@ -55,7 +55,7 @@ class Translator extends BaseTranslator
                 ->exists();
 
             if (!$exists) {
-                \Jawabapp\Localization\Models\Translation::create([
+                $translation = \Jawabapp\Localization\Models\Translation::create([
                     'locale' => $locale,
                     'group' => $group,
                     'key' => $itemKey,
@@ -67,12 +67,30 @@ class Translator extends BaseTranslator
                 if (config('localization.fallback.log_missing', false)) {
                     \Log::info("Auto-created translation key: {$key} for locale: {$locale}");
                 }
+
+                // Add the key to the loaded translations immediately
+                $this->addToLoadedTranslations($locale, $namespace, $group, $itemKey, $key);
             }
         } catch (\Exception $e) {
             // Silently fail if database operations fail
             if (config('localization.fallback.log_missing', false)) {
                 \Log::error("Failed to auto-create translation key: {$key} for locale: {$locale}. Error: " . $e->getMessage());
             }
+        }
+    }
+
+    /**
+     * Add a translation to the loaded translations cache
+     */
+    protected function addToLoadedTranslations(string $locale, ?string $namespace, string $group, string $key, string $value): void
+    {
+        // Add to the loaded array for immediate use
+        if ($namespace && $namespace !== '*') {
+            // For namespaced translations
+            $this->loaded[$namespace][$locale][$group][$key] = $value;
+        } else {
+            // For non-namespaced translations
+            $this->loaded['*'][$locale][$group][$key] = $value;
         }
     }
 }
