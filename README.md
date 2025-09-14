@@ -50,7 +50,30 @@ php artisan migrate
 
 ### 3. Configure Middleware
 
-Add the middleware to your `app/Http/Kernel.php`:
+**For Laravel 11+**, add the middleware to your `bootstrap/app.php`:
+
+```php
+<?php
+
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Exceptions;
+use Illuminate\Foundation\Configuration\Middleware;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withMiddleware(function (Middleware $middleware): void {
+        // Register localization middleware
+        $middleware->alias([
+            'localization' => \Jawabapp\Localization\Http\Middleware\Web\Localization::class,
+            'localization.web' => \Jawabapp\Localization\Http\Middleware\Web\Localization::class,
+            'localization.api' => \Jawabapp\Localization\Http\Middleware\Api\Localization::class,
+        ]);
+    })
+    ->withExceptions(function (Exceptions $exceptions): void {
+        //
+    })->create();
+```
+
+**For Laravel 10 and earlier**, add the middleware to your `app/Http/Kernel.php`:
 
 ```php
 protected $middlewareGroups = [
@@ -561,7 +584,15 @@ php artisan localization:clear-cache
 php artisan localization:export
 ```
 
-**2. Middleware not working**
+**2. Middleware not working (Laravel 11)**
+```php
+// Ensure middleware is registered in bootstrap/app.php
+$middleware->alias([
+    'localization' => \Jawabapp\Localization\Http\Middleware\Web\Localization::class,
+]);
+```
+
+**2b. Middleware not working (Laravel 10 and earlier)**
 ```php
 // Ensure middleware is registered in Kernel.php
 \Jawabapp\Localization\Http\Middleware\Web\Localization::class,
@@ -579,6 +610,33 @@ Route::prefix(Localization::routePrefix())
 ```bash
 # Check if routes are enabled
 'routes' => ['enabled' => true]
+```
+
+**5. "Call to a member function total() on array" error**
+```bash
+# This error occurs when the layout expects paginated data but receives an array
+# The fix is included in the updated controller - no action needed for users
+```
+
+**6. "Class Jawabapp\Localization\Libraries\Localization not found" error**
+```bash
+# This error occurs when trying to update translations
+# The fix is included in the updated controller - no action needed for users
+```
+
+**7. Export functionality not working**
+```bash
+# If Artisan commands don't work from web interface, try from command line:
+php artisan localization:export
+
+# The web interface now includes direct export functionality as fallback
+```
+
+**8. "SQLSTATE[23000]: Integrity constraint violation: 19 NOT NULL constraint failed: translations.key"**
+```bash
+# This occurs when translation key parsing fails
+# Ensure your translations have proper namespace, group, and key structure
+# The updated controller handles this automatically
 ```
 
 ### Debug Mode

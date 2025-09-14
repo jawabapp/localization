@@ -3,7 +3,8 @@
 namespace Jawabapp\Localization\Console\Commands;
 
 use Illuminate\Console\Command;
-use Jawabapp\Localization\Libraries\Localization;
+use Jawabapp\Localization\Models\Translation;
+use Illuminate\Support\Facades\File;
 
 class ExportTranslations extends Command
 {
@@ -41,7 +42,7 @@ class ExportTranslations extends Command
             } elseif ($locale) {
                 $this->exportLocale($locale, $format);
             } else {
-                Localization::exportTranslations();
+                $this->exportAllTranslations($format);
             }
 
             $this->info('✅ Translations exported successfully!');
@@ -49,6 +50,18 @@ class ExportTranslations extends Command
         } catch (\Exception $e) {
             $this->error('❌ Export failed: ' . $e->getMessage());
             return Command::FAILURE;
+        }
+    }
+
+    /**
+     * Export all translations for all locales
+     */
+    private function exportAllTranslations(string $format): void
+    {
+        $locales = config('localization.supported_locales', ['en']);
+
+        foreach ($locales as $locale) {
+            $this->exportLocale($locale, $format);
         }
     }
 

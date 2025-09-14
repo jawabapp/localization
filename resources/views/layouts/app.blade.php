@@ -158,7 +158,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                         </svg>
                                         Translations
-                                        <span class="{{ request()->routeIs('localization.jawab.translation.index') ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-600' }} ml-auto w-9 min-w-max whitespace-nowrap rounded-full px-2.5 py-0.5 text-center text-xs font-medium leading-5 transition-colors duration-200">{{ $data->total() ?? '0' }}</span>
+                                        <span class="{{ request()->routeIs('localization.jawab.translation.index') ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-600' }} ml-auto w-9 min-w-max whitespace-nowrap rounded-full px-2.5 py-0.5 text-center text-xs font-medium leading-5 transition-colors duration-200">{{ (is_object($data) && method_exists($data, 'total')) ? $data->total() : (is_array($data) ? count($data) : '0') }}</span>
                                     </a>
                                 </li>
                                 <li>
